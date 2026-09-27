@@ -4,15 +4,37 @@
 
 Работает только на чтение: ничего не отправляет и не меняет в транскриптах.
 
-## Запуск
+## Скачать
 
-Готовые сборки под Windows (x64) и macOS (Apple Silicon и Intel) делает GitHub Actions ([build.yml](.github/workflows/build.yml)): на каждый пуш в `main` — артефакты прогона, на тег `v*` — ещё и релиз с `Tokenoscope-<версия>-win-x64.zip`, `…-mac-arm64.dmg` и `…-mac-x64.dmg`.
+Последний релиз (ссылки всегда ведут на свежую сборку):
 
-Сборка для macOS подписана только ad-hoc, без Developer ID и нотаризации, поэтому при первом запуске Gatekeeper её не пустит. Открыть: «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть» или снять карантин:
+| Система | Файл |
+|---|---|
+| Windows 10/11, x64 | [Tokenoscope-win-x64.zip](https://github.com/ianepanda/tokenoscope/releases/latest/download/Tokenoscope-win-x64.zip) |
+| macOS, Apple Silicon (M1 и новее) | [Tokenoscope-mac-arm64.dmg](https://github.com/ianepanda/tokenoscope/releases/latest/download/Tokenoscope-mac-arm64.dmg) |
+| macOS, Intel | [Tokenoscope-mac-x64.dmg](https://github.com/ianepanda/tokenoscope/releases/latest/download/Tokenoscope-mac-x64.dmg) |
 
-```
-xattr -dr com.apple.quarantine /Applications/Токеноскоп.app
-```
+Сборки делает GitHub Actions ([build.yml](.github/workflows/build.yml)): на каждый пуш в `main` — артефакты прогона, на тег `v*` — релиз с этими тремя файлами.
+
+### Запуск на macOS
+
+1. Какой файл брать: меню Apple → «Об этом Mac». «Чип Apple M…» — `mac-arm64`, «Процессор Intel» — `mac-x64`.
+2. Открыть `.dmg` и перетащить «Токеноскоп» в «Программы» (Applications).
+3. Первый запуск. Приложение не подписано сертификатом Apple, поэтому macOS его не откроет и скажет, что не может проверить разработчика. Нажать «Готово», затем «Системные настройки → Конфиденциальность и безопасность», внизу у строки про «Токеноскоп» — «Всё равно открыть» и подтвердить паролем. Дальше запускается как обычно.
+
+   То же одной командой в Терминале — снять карантин с приложения:
+
+   ```
+   xattr -dr com.apple.quarantine /Applications/Токеноскоп.app
+   ```
+
+Транскрипты читаются из `~/.claude/projects`; другие папки добавляются в настройках.
+
+### Запуск на Windows
+
+Распаковать zip куда удобно и запустить `Tokenoscope.exe` из папки `Токеноскоп-win32-x64`. Если SmartScreen пишет «Windows защитил ваш компьютер» — «Подробнее → Выполнить в любом случае»: exe тоже не подписан.
+
+## Сборка
 
 Сборка из исходников — под текущую ОС (или `node scripts/build.mjs --platform=… --arch=…`; под macOS — только на macOS):
 

@@ -21,6 +21,9 @@ jobs:
           - { os: windows-latest, platform: win32, arch: x64, label: win-x64 }
           - { os: macos-latest, platform: darwin, arch: arm64, label: mac-arm64 }
           - { os: macos-latest, platform: darwin, arch: x64, label: mac-x64 }
+    # Имя без версии: README ссылается на releases/latest/download/<имя>.
+    env:
+      ASSET: Tokenoscope-${{ matrix.label }}
     steps:
       - uses: actions/checkout@v7
 
@@ -35,10 +38,6 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
 
       - run: node scripts/build.mjs --platform=${{ matrix.platform }} --arch=${{ matrix.arch }}
-
-      - name: version
-        shell: bash
-        run: echo "ASSET=Tokenoscope-$(node -p "require('./package.json').version")-${{ matrix.label }}" >> "$GITHUB_ENV"
 
       - name: zip (Windows)
         if: matrix.platform == 'win32'
