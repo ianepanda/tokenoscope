@@ -76,10 +76,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Артефакты залиты без архивации; без skip-decompress zip под Windows распаковался бы в папку.
       - uses: actions/download-artifact@v8
         with:
           path: out
           merge-multiple: true
+          skip-decompress: true
       - uses: softprops/action-gh-release@v3
         with:
           files: out/*
