@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tokenoscope-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/dev-server.js", "5178"],
+      "port": 5178
+    }
+  ]
+}

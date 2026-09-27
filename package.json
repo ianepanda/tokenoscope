@@ -1,0 +1,24 @@
+{
+  "name": "claude-usage-lens",
+  "version": "0.1.0",
+  "description": "Куда уходят токены Claude Code: разбор транскриптов ~/.claude/projects по проектам, сессиям, агентам и содержимому контекста",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "postinstall": "node scripts/vendor.js",
+    "check": "node scripts/check.js",
+    "icon": "node scripts/make-icon.js",
+    "build": "node scripts/build.mjs",
+    "build:install": "node scripts/build.mjs --shortcuts"
+  },
+  "dependencies": {
+    "htm": "^3.1.1",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^44.4.5"
+  },
+  "productName": "Токеноскоп"
+}

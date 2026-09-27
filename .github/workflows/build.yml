@@ -1,0 +1,87 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, platform: win32, arch: x64, label: win-x64 }
+          - { os: macos-latest, platform: darwin, arch: arm64, label: mac-arm64 }
+          - { os: macos-latest, platform: darwin, arch: x64, label: mac-x64 }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # Бинарник Electron под хост не нужен: упаковщик сам скачивает Electron под целевую платформу.
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+      - run: node scripts/build.mjs --platform=${{ matrix.platform }} --arch=${{ matrix.arch }}
+
+      - name: version
+        shell: bash
+        run: echo "ASSET=Tokenoscope-$(node -p "require('./package.json').version")-${{ matrix.label }}" >> "$GITHUB_ENV"
+
+      - name: zip (Windows)
+        if: matrix.platform == 'win32'
+        shell: pwsh
+        run: |
+          $dir = (Get-Item "dist/*-win32-${{ matrix.arch }}").FullName
+          7z a -tzip -mcu=on "$($env:ASSET).zip" $dir
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      # DMG, а не zip артефакта: zip теряет симлинки фреймворков и бит исполняемости.
+      # hdiutil на раннерах изредка падает с «Resource busy» — повторяем.
+      - name: dmg (macOS)
+        if: matrix.platform == 'darwin'
+        shell: bash
+        run: |
+          stage="$RUNNER_TEMP/dmg"
+          mkdir -p "$stage"
+          cp -R dist/*-darwin-${{ matrix.arch }}/*.app "$stage/"
+          ln -s /Applications "$stage/Applications"
+          for i in 1 2 3; do
+            hdiutil create -volname "Токеноскоп" -srcfolder "$stage" -fs HFS+ -format UDZO -ov "$ASSET.dmg" && break
+            sleep 10
+          done
+          test -f "$ASSET.dmg"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.ASSET }}.*
+          archive: false
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: out/*
+          generate_release_notes: true
