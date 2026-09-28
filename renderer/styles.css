@@ -227,6 +227,17 @@ nav { display: flex; flex-direction: column; gap: 2px; }
 .dd-item-sub { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dd-empty { color: var(--muted); padding: 8px; }
 .dd-foot { display: flex; justify-content: space-between; padding: 4px 6px 0; border-top: 1px solid var(--border); }
+.dd-panel.right { left: auto; right: 0; }
+.dd-action {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; text-align: left;
+  border: 0; background: none; padding: 6px 8px; border-radius: 6px; cursor: pointer;
+}
+.dd-action:hover { background: var(--surface-2); }
+.dd-note { font-size: 12px; color: var(--muted); padding: 8px 8px 2px; border-top: 1px solid var(--border); }
+.export-panel { width: 300px; font-size: 12px; }
+.export-panel .dd-action { font-size: 13px; }
+.export-name { font-weight: 600; word-break: break-all; }
+.export-links { display: flex; gap: 14px; margin-top: 6px; }
 
 /* ---------- Карточки и плитки ---------- */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); min-width: 0; }

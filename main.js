@@ -7,6 +7,7 @@ const { buildDataset } = require('./lib/dataset');
 const { readSidebar } = require('./lib/sidebar');
 const { Settings } = require('./lib/settings');
 const { readTranscript, readBlock, readJournal, readScript } = require('./lib/transcript');
+const { buildExport } = require('./lib/export');
 
 app.setName('Токеноскоп');
 // Один идентификатор с ярлыком — окно группируется на панели задач под иконкой приложения.
@@ -23,6 +24,8 @@ let watchers = [];
 let watchTimer = null;
 let lastAutoScan = 0;
 const AUTO_MIN_GAP = 20000;
+// Файлы, сохранённые экспортом: открыть их или показать в папке можно, хотя они вне папок с транскриптами.
+const exported = new Set();
 
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
@@ -198,6 +201,32 @@ app.whenReady().then(() => {
   ipcMain.handle('transcript:block', (_e, p, ln, bi) => readBlock(guard(p, '.jsonl'), ln, bi));
   ipcMain.handle('journal:read', (_e, p) => readJournal(guard(p, '.jsonl')));
   ipcMain.handle('script:read', (_e, p) => readScript(guard(p, '.js')));
+  // Экспорт транскрипта: сначала сборка — из неё имя файла по умолчанию, и ошибка всплывёт до диалога
+  // (даже 40 МБ транскрипта собираются за полсекунды), потом диалог сохранения.
+  ipcMain.handle('transcript:export', async (_e, p, format, meta) => {
+    const file = guard(p, '.jsonl');
+    const fmt = format === 'html' ? 'html' : 'md';
+    const out = buildExport(file, fmt, meta);
+    const last = settings.get().exportDir;
+    const dir = last && fs.existsSync(last) ? last : app.getPath('documents');
+    const r = await dialog.showSaveDialog(win, {
+      title: fmt === 'html' ? 'Сохранить транскрипт в HTML' : 'Сохранить транскрипт в Markdown',
+      defaultPath: path.join(dir, out.fileName),
+      filters: [fmt === 'html' ? { name: 'HTML', extensions: ['html'] } : { name: 'Markdown', extensions: ['md'] }],
+    });
+    if (r.canceled || !r.filePath) return null;
+    fs.writeFileSync(r.filePath, out.content, 'utf8');
+    exported.add(path.resolve(r.filePath).toLowerCase());
+    settings.set({ exportDir: path.dirname(r.filePath) });
+    return { path: r.filePath };
+  });
+  const isExported = (p) => typeof p === 'string' && exported.has(path.resolve(p).toLowerCase());
+  ipcMain.handle('export:open', (_e, p) => {
+    if (isExported(p)) shell.openPath(path.resolve(p));
+  });
+  ipcMain.handle('export:reveal', (_e, p) => {
+    if (isExported(p)) shell.showItemInFolder(path.resolve(p));
+  });
   ipcMain.handle('shell:showItem', (_e, p) => {
     if (isKnownPath(p)) shell.showItemInFolder(path.resolve(p));
   });

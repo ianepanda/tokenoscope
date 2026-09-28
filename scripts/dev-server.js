@@ -9,6 +9,7 @@ const { buildDataset } = require('../lib/dataset');
 const { readSidebar } = require('../lib/sidebar');
 const { Settings } = require('../lib/settings');
 const { readTranscript, readBlock, readJournal, readScript } = require('../lib/transcript');
+const { buildExport } = require('../lib/export');
 
 const port = +(process.argv[2] || 5178);
 const root = path.join(__dirname, '..', 'renderer');
@@ -30,6 +31,8 @@ async function dataset(force) {
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json' };
 
+const inRoots = (p) => typeof p === 'string' && scanner.roots.some((r) => path.resolve(p).toLowerCase().startsWith(path.resolve(r).toLowerCase() + path.sep));
+
 http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
@@ -38,10 +41,24 @@ http.createServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(body);
     }
+    if (url.pathname === '/api/export' && req.method === 'POST') {
+      let raw = '';
+      for await (const chunk of req) raw += chunk;
+      const { path: p, format, meta } = JSON.parse(raw || '{}');
+      if (!inRoots(p) || !p.toLowerCase().endsWith('.jsonl')) {
+        res.writeHead(403);
+        return res.end();
+      }
+      const out = buildExport(p, format, meta);
+      res.writeHead(200, {
+        'content-type': format === 'html' ? 'text/html; charset=utf-8' : 'text/markdown; charset=utf-8',
+        'x-file-name': encodeURIComponent(out.fileName),
+      });
+      return res.end(out.content);
+    }
     if (url.pathname.startsWith('/api/read/')) {
       const p = url.searchParams.get('path');
-      const inRoot = scanner.roots.some((r) => path.resolve(p).toLowerCase().startsWith(path.resolve(r).toLowerCase() + path.sep));
-      if (!inRoot) {
+      if (!inRoots(p)) {
         res.writeHead(403);
         return res.end();
       }

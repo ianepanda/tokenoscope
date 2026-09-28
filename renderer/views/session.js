@@ -10,6 +10,7 @@ import {
   fmtUsd, fmtInt, fmtTok, fmtTokShort, fmtPct, fmtDateTime, fmtDuration, fmtDay, fmtTime, fmtWeekday, shortId,
 } from '../lib/format.js';
 import { dropEmptySeries } from './overview.js';
+import { ExportMenu } from './transcript.js';
 
 function effortSummary(map, efforts) {
   const tot = [...map.values()].reduce((s, x) => s + x, 0);
@@ -105,6 +106,7 @@ export function SessionDetail({ session }) {
       </div>
       ${mainFile && html`<div class="head-actions">
         <button class="btn small primary" onClick=${() => go({ view: 'transcript', file: s.mainFile })}>Читать транскрипт</button>
+        <${ExportMenu} fileIdx=${s.mainFile} />
         <button class="btn small" onClick=${() => window.api.showInFolder(mainFile.path)}>Файл в папке</button>
       </div>`}
     </div>

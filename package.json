@@ -1,6 +1,6 @@
 {
   "name": "claude-usage-lens",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Куда уходят токены Claude Code: разбор транскриптов ~/.claude/projects по проектам, сессиям, агентам и содержимому контекста",
   "main": "main.js",
   "private": true,
@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "htm": "^3.1.1",
+    "marked": "^18.0.14",
     "preact": "^10.29.8"
   },
   "devDependencies": {

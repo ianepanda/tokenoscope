@@ -2,7 +2,7 @@
 import { html, useState, useEffect, useMemo, useRef } from '../lib/h.js';
 import { useApp } from '../lib/app-context.js';
 import { resolvePrice, sessionTitle, runName } from '../lib/data.js';
-import { Pill } from '../lib/ui.js';
+import { Pill, useOutsideClose } from '../lib/ui.js';
 import { fmtUsd, fmtInt, fmtTokShort, fmtDateTime, fmtTime } from '../lib/format.js';
 
 const PAGE = 150;
@@ -58,6 +58,67 @@ function ToolCard({ use, result, path, showResults }) {
     ${result && (open || showResults) && html`<div class="tool-body">
       <div class="tool-label">Результат</div>
       <${TextBlock} block=${result} path=${path} preview=${open ? 6000 : 500} className="code-text" />
+    </div>`}
+  </div>`;
+}
+
+function threadName(P, file) {
+  const name = file.label || file.agentType || 'агент';
+  const parts = [`Агент: ${name}`];
+  if (file.agentType && file.agentType !== name && file.agentType !== 'workflow-subagent') parts.push(file.agentType);
+  if (file.phase) parts.push(`фаза ${file.phase}`);
+  const run = file.run ? P.ds.sessions[file.session].runs.find((r) => r.run === file.run) : null;
+  if (run) parts.push(`прогон ${runName(run.name)}`);
+  return parts.join(' · ');
+}
+
+// Сохранение потока в Markdown или HTML — так, как он виден в Claude в обычном режиме (lib/export.js).
+export function ExportMenu({ fileIdx }) {
+  const { P } = useApp();
+  const [panel, setPanel] = useState(null); // 'menu' | { saved, download } | { error }
+  const [busy, setBusy] = useState(false);
+  const ref = useOutsideClose(!!panel, () => setPanel(null));
+  const file = P.ds.files[fileIdx];
+  if (!file) return null;
+  const save = async (format) => {
+    const sess = P.ds.sessions[file.session];
+    const meta = {
+      title: sessionTitle(P, file.session),
+      thread: file.kind === 0 ? null : threadName(P, file),
+      project: P.ds.projects[sess.project].name,
+      branch: sess.gitBranch,
+    };
+    setPanel(null);
+    setBusy(true);
+    try {
+      const r = await window.api.exportTranscript(file.path, format, meta);
+      setPanel(r ? { saved: r.path, download: !!r.download } : null);
+    } catch (e) {
+      setPanel({ error: String((e && e.message) || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const done = panel && panel !== 'menu' ? panel : null;
+  const act = (fn) => () => {
+    fn(done.saved);
+    setPanel(null);
+  };
+  return html`<div class="dropdown" ref=${ref}>
+    <button class="btn small" disabled=${busy} onClick=${() => setPanel(panel === 'menu' ? null : 'menu')}
+      title="Сохранить транскрипт так, как он виден в Claude в обычном режиме">${busy ? 'Сохраняю…' : 'Сохранить ▾'}</button>
+    ${panel === 'menu' && html`<div class="dd-panel right export-panel">
+      <button class="dd-action" onClick=${() => save('md')}>Markdown<span class="muted">.md</span></button>
+      <button class="dd-action" onClick=${() => save('html')}>HTML-страница<span class="muted">.html</span></button>
+      <div class="dd-note">Как в Claude в обычном режиме: сообщения и ответы целиком, вызовы инструментов — строками-сводками. Размышления, команды и результаты в файл не попадают.</div>
+    </div>`}
+    ${done && html`<div class="dd-panel right export-panel">
+      ${done.error ? html`<div class="warn-text">Не удалось сохранить: ${done.error}</div>` : html`
+        <div>${done.download ? 'Скачано' : 'Сохранено'}: <span class="export-name" title=${done.saved}>${done.saved.split(/[\\/]/).pop()}</span></div>
+        ${!done.download && html`<div class="export-links">
+          <button class="link" onClick=${act(window.api.openExport)}>Открыть</button>
+          <button class="link" onClick=${act(window.api.revealExport)}>Показать в папке</button>
+        </div>`}`}
     </div>`}
   </div>`;
 }
@@ -231,7 +292,10 @@ function Transcript({ fileIdx, focusTs }) {
           ${run.script && html`<a class="link" onClick=${() => go({ view: 'script', session: file.session, run: run.run })}>Скрипт воркфлоу</a>`}
         </div>`}
       </div>
-      <button class="btn small" onClick=${() => window.api.showInFolder(file.path)}>Файл в папке</button>
+      <div class="head-actions">
+        <${ExportMenu} fileIdx=${fileIdx} />
+        <button class="btn small" onClick=${() => window.api.showInFolder(file.path)}>Файл в папке</button>
+      </div>
     </div>
     <div class="viewer-bar">
       <input class="search" placeholder="Поиск по тексту, командам и результатам…" value=${q} onInput=${(e) => { setQ(e.target.value); setShown(PAGE); }} />

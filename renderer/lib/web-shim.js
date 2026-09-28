@@ -16,6 +16,22 @@ if (!window.api) {
     readBlock: (p, ln, bi) => getJson(`/api/read/block?path=${encodeURIComponent(p)}&ln=${ln}&bi=${bi}`),
     readJournal: (p) => getJson('/api/read/journal?path=' + encodeURIComponent(p)),
     readScript: (p) => getJson('/api/read/script?path=' + encodeURIComponent(p)),
+    // Вместо диалога сохранения — обычное скачивание файла браузером.
+    exportTranscript: async (p, format, meta) => {
+      const r = await fetch('/api/export', { method: 'POST', body: JSON.stringify({ path: p, format, meta }) });
+      if (!r.ok) throw new Error(`dev-сервер ответил ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      const name = decodeURIComponent(r.headers.get('x-file-name') || `transcript.${format}`);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(await r.blob());
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      return { path: name, download: true };
+    },
+    openExport: async () => {},
+    revealExport: async () => {},
     showInFolder: async () => {},
     openExternal: async (url) => window.open(url, '_blank'),
     copyText: async (t) => navigator.clipboard && navigator.clipboard.writeText(t),
