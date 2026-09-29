@@ -13,8 +13,9 @@
 | Windows 10/11, x64 | [Tokenoscope-win-x64.zip](https://github.com/ianepanda/tokenoscope/releases/latest/download/Tokenoscope-win-x64.zip) |
 | macOS, Apple Silicon (M1 и новее) | [Tokenoscope-mac-arm64.dmg](https://github.com/ianepanda/tokenoscope/releases/latest/download/Tokenoscope-mac-arm64.dmg) |
 | macOS, Intel | [Tokenoscope-mac-x64.dmg](https://github.com/ianepanda/tokenoscope/releases/latest/download/Tokenoscope-mac-x64.dmg) |
+| Linux, x64 | [Tokenoscope-linux-x64.tar.gz](https://github.com/ianepanda/tokenoscope/releases/latest/download/Tokenoscope-linux-x64.tar.gz) |
 
-Сборки делает GitHub Actions ([build.yml](.github/workflows/build.yml)): на каждый пуш в `main` — артефакты прогона, на тег `v*` — релиз с этими тремя файлами.
+Сборки делает GitHub Actions ([build.yml](.github/workflows/build.yml)): на каждый пуш в `main` — артефакты прогона, на тег `v*` — релиз с этими четырьмя файлами.
 
 ### Запуск на macOS
 
@@ -34,19 +35,37 @@
 
 Распаковать zip куда удобно и запустить `Tokenoscope.exe` из папки `Токеноскоп-win32-x64`. Если SmartScreen пишет «Windows защитил ваш компьютер» — «Подробнее → Выполнить в любом случае»: exe тоже не подписан.
 
+### Запуск на Linux
+
+Распаковать архив и запустить бинарник:
+
+```
+tar -xzf Tokenoscope-linux-x64.tar.gz
+cd Токеноскоп-linux-x64
+./Tokenoscope
+```
+
+Нужен графический десктоп с GTK: на обычной Ubuntu или Fedora всё уже есть, на голой системе доставить `libgtk-3-0`, `libnss3` и `libasound2`. Если Electron ругается, что `chrome-sandbox` настроен неправильно (так бывает, когда ядро запрещает непривилегированные user namespace), выдать хелперу песочницы права в папке приложения:
+
+```
+sudo chown root:root chrome-sandbox && sudo chmod 4755 chrome-sandbox
+```
+
+Можно и запускать с `--no-sandbox`, но тогда рендерер работает без песочницы.
+
 ## Сборка
 
 Сборка из исходников — под текущую ОС (или `node scripts/build.mjs --platform=… --arch=…`; под macOS — только на macOS):
 
 ```
 npm install
-npm run build            # Windows: dist\Токеноскоп-win32-x64\Tokenoscope.exe, macOS: dist/Токеноскоп-darwin-arm64/Токеноскоп.app
+npm run build            # Windows: dist\Токеноскоп-win32-x64\Tokenoscope.exe, macOS: dist/Токеноскоп-darwin-arm64/Токеноскоп.app, Linux: dist/Токеноскоп-linux-x64/Tokenoscope
 npm run build:install    # Windows: то же + ярлыки «Токеноскоп» на рабочем столе и в меню «Пуск»
 ```
 
 Запуск без сборки, для разработки: `npm start`. Иконка рисуется скриптом `npm run icon` (без внешних библиотек) в `build\icon.png`, `build\icon.ico` и `build\icon.icns`. Если сборка упала с `EPERM` — это антивирус держит свежий `electron.exe`; скрипт сам повторяет попытку.
 
-Первый запуск разбирает всё за несколько секунд (1,2 ГБ транскриптов ≈ 2,5 с в пуле worker-потоков), дальше — из кэша в папке данных приложения (`%APPDATA%\Токеноскоп`, на macOS — `~/Library/Application Support/Токеноскоп`). Пока приложение открыто, оно следит за папкой транскриптов и обновляет сводку, не чаще раза в 20 секунд. Ctrl+R (на macOS — Cmd+R) — обновить вручную, F12 — инструменты разработчика.
+Первый запуск разбирает всё за несколько секунд (1,2 ГБ транскриптов ≈ 2,5 с в пуле worker-потоков), дальше — из кэша в папке данных приложения (`%APPDATA%\Токеноскоп`, на macOS — `~/Library/Application Support/Токеноскоп`, на Linux — `~/.config/Токеноскоп`). Пока приложение открыто, оно следит за папкой транскриптов и обновляет сводку, не чаще раза в 20 секунд. Ctrl+R (на macOS — Cmd+R) — обновить вручную, F12 — инструменты разработчика.
 
 ## Что внутри
 

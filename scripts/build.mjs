@@ -1,7 +1,8 @@
 // Сборка приложения под текущую ОС или под --platform/--arch:
 //   win32  -> dist/Токеноскоп-win32-x64/Tokenoscope.exe
 //   darwin -> dist/Токеноскоп-darwin-arm64/Токеноскоп.app (только на macOS: нужен codesign)
-// node scripts/build.mjs [--platform=win32|darwin] [--arch=x64|arm64] [--shortcuts]
+//   linux  -> dist/Токеноскоп-linux-x64/Tokenoscope
+// node scripts/build.mjs [--platform=win32|darwin|linux] [--arch=x64|arm64] [--shortcuts]
 //   (--shortcuts — ярлыки Windows на рабочем столе и в меню «Пуск»)
 import { packager } from '@electron/packager';
 import { execFileSync } from 'node:child_process';
@@ -14,8 +15,9 @@ const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 const argOf = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const platform = argOf('platform') || process.platform;
 const arch = argOf('arch') || process.arch;
-const iconExt = { win32: 'ico', darwin: 'icns' }[platform];
-if (!iconExt) throw new Error(`Сборка под ${platform} не настроена, есть только win32 и darwin`);
+// Под linux упаковщик иконку игнорирует, png здесь — только чтобы платформа считалась настроенной.
+const iconExt = { win32: 'ico', darwin: 'icns', linux: 'png' }[platform];
+if (!iconExt) throw new Error(`Сборка под ${platform} не настроена, есть только win32, darwin и linux`);
 // Без codesign бандл с изменённым Info.plist не запустится на Apple Silicon.
 if (platform === 'darwin' && process.platform !== 'darwin') throw new Error('Сборка под macOS — только на macOS');
 
@@ -82,6 +84,7 @@ if (platform === 'darwin') {
 
 const exe = path.join(appDir, 'Tokenoscope.exe');
 if (platform === 'win32') console.log(`app: ${exe}`);
+if (platform === 'linux') console.log(`app: ${path.join(appDir, 'Tokenoscope')}`);
 
 if (platform === 'win32' && process.argv.includes('--shortcuts')) {
   const ps = `

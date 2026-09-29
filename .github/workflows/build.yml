@@ -21,6 +21,7 @@ jobs:
           - { os: windows-latest, platform: win32, arch: x64, label: win-x64 }
           - { os: macos-latest, platform: darwin, arch: arm64, label: mac-arm64 }
           - { os: macos-latest, platform: darwin, arch: x64, label: mac-x64 }
+          - { os: ubuntu-latest, platform: linux, arch: x64, label: linux-x64 }
     # Имя без версии: README ссылается на releases/latest/download/<имя>.
     env:
       ASSET: Tokenoscope-${{ matrix.label }}
@@ -62,6 +63,12 @@ jobs:
             sleep 10
           done
           test -f "$ASSET.dmg"
+
+      # tar, а не zip: сохраняет бит исполняемости и симлинки внутри сборки.
+      - name: tar.gz (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: tar -czf "$ASSET.tar.gz" -C dist "$(basename dist/*-linux-${{ matrix.arch }})"
 
       - uses: actions/upload-artifact@v7
         with:
