@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["scripts/dev-server.js", "5178"],
       "port": 5178
+    },
+    {
+      "name": "tokenoscope-dev-sandbox",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/dev-server.js", "5179", "--sandbox"],
+      "port": 5179
     }
   ]
 }

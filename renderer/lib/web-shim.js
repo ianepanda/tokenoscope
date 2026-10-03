@@ -6,6 +6,15 @@ const getJson = (url, opts) => fetch(url, opts).then(async (r) => {
   return JSON.parse(t, revive);
 });
 
+const syncCall = (what, body) => getJson('/api/sync/' + what, { method: 'POST', body: JSON.stringify(body || {}) });
+let events = null;
+const syncEvent = (name, cb) => {
+  if (!events) events = new EventSource('/api/sync/events');
+  const h = (e) => cb(JSON.parse(e.data));
+  events.addEventListener(name, h);
+  return () => events.removeEventListener(name, h);
+};
+
 if (!window.api) {
   window.api = {
     getDataset: () => getJson('/api/dataset'),
@@ -38,5 +47,19 @@ if (!window.api) {
     pickFolder: async () => null,
     onProgress: () => () => {},
     onDataset: () => () => {},
+    syncStatus: () => syncCall('status'),
+    syncRefresh: () => syncCall('refresh'),
+    syncRun: () => syncCall('run'),
+    syncSwitch: (to) => syncCall('switch', { to }),
+    syncCloseAndSync: () => syncCall('closeAndSync'),
+    syncCancel: () => syncCall('cancel'),
+    syncUndo: (opId) => syncCall('undo', { opId }),
+    syncLaunch: () => syncCall('launch'),
+    syncSetLabel: (account, label) => syncCall('setLabel', { account, label }),
+    syncOpenStore: async () => {},
+    syncOpenJournal: async () => {},
+    onSyncStatus: (cb) => syncEvent('status', cb),
+    onSyncProgress: (cb) => syncEvent('progress', cb),
+    onNav: () => () => {},
   };
 }

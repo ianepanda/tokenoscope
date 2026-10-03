@@ -10,20 +10,37 @@ const { readSidebar } = require('../lib/sidebar');
 const { Settings } = require('../lib/settings');
 const { readTranscript, readBlock, readJournal, readScript } = require('../lib/transcript');
 const { buildExport } = require('../lib/export');
+const { SyncService } = require('../lib/sync-service');
+const { launchDesktop } = require('../lib/desktop');
 
 const port = +(process.argv[2] || 5178);
+// --sandbox[=<папка>] — синхронизация аккаунтов пишет в песочницу scripts/sync-sandbox.js.
+const sbxArg = process.argv.find((a) => a === '--sandbox' || a.startsWith('--sandbox='));
+if (sbxArg) process.env.TOKENOSCOPE_SYNC_SANDBOX = sbxArg.includes('=') ? sbxArg.slice(10) : path.join(fs.realpathSync.native(os.tmpdir()), 'tokenoscope-sync-sbx');
 const root = path.join(__dirname, '..', 'renderer');
 const dataDir = path.join(os.tmpdir(), 'tokenoscope-dev');
 const settings = new Settings(path.join(dataDir, 'settings.json'));
 let scanner = new Scanner({ roots: settings.get().roots, cacheFile: path.join(dataDir, 'parse-cache.bin') });
 let cached = null;
 
+// Синхронизация аккаунтов. Писать dev-сервер может только в песочницу (TOKENOSCOPE_SYNC_SANDBOX,
+// см. scripts/sync-sandbox.js): иначе кнопка в браузере меняла бы настоящие сайдбары Claude.
+const sync = new SyncService({ dataDir: path.join(process.env.TOKENOSCOPE_SYNC_SANDBOX || dataDir, 'account-sync'), settings });
+const sseClients = new Set();
+const sse = (event, data) => {
+  const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const res of sseClients) res.write(msg);
+};
+sync.on('status', (st) => sse('status', st));
+sync.on('progress', (b) => sse('progress', b));
+sync.start();
+const SYNC_WRITES = new Set(['run', 'switch', 'closeAndSync', 'undo']);
+
 async function dataset(force) {
   if (cached && !force) return cached;
   const t0 = Date.now();
   const scan = await scanner.scan();
-  const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-  const ds = buildDataset(scan, readSidebar(appData));
+  const ds = buildDataset(scan, readSidebar());
   ds.meta.scan = { ...scan.stats, totalMs: Date.now() - t0, roots: scanner.roots };
   cached = JSON.stringify(ds, (k, v) => (ArrayBuffer.isView(v) ? { __ta: v.constructor.name, data: Array.from(v) } : v));
   return cached;
@@ -69,12 +86,57 @@ http.createServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(JSON.stringify(out));
     }
+    if (url.pathname === '/api/sync/events') {
+      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
+      res.write(': ok\n\n');
+      sseClients.add(res);
+      req.on('close', () => sseClients.delete(res));
+      return undefined;
+    }
+    if (url.pathname.startsWith('/api/sync/')) {
+      const what = url.pathname.slice('/api/sync/'.length);
+      let raw = '';
+      for await (const chunk of req) raw += chunk;
+      const body = JSON.parse(raw || '{}');
+      if (SYNC_WRITES.has(what) && !sync.env.sandbox) {
+        res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+        return res.end('dev-сервер пишет только в песочницу: запусти его с TOKENOSCOPE_SYNC_SANDBOX');
+      }
+      try {
+        if (what === 'refresh') await sync.refresh();
+        else if (what === 'run') await sync.run({ trigger: 'manual' });
+        else if (what === 'switch') await sync.startSwitch(String(body.to || ''));
+        else if (what === 'closeAndSync') await sync.closeAndSync();
+        else if (what === 'cancel') sync.cancelFlow();
+        else if (what === 'undo') {
+          const report = await sync.engine.undo(String(body.opId || ''));
+          sync.last = { at: Date.now(), trigger: 'undo', result: 'undone', undo: report };
+          await sync.refresh();
+        } else if (what === 'launch') {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          return res.end(JSON.stringify(launchDesktop(sync.env)));
+        } else if (what === 'setLabel') {
+          const labels = { ...(settings.get().accountLabels || {}) };
+          if (body.label && String(body.label).trim()) labels[body.account] = String(body.label).trim().slice(0, 60);
+          else delete labels[body.account];
+          settings.set({ accountLabels: labels });
+          await sync.refresh();
+        } else if (what === 'status' && !sync.plan && !sync.planning) sync.refresh().catch(() => {});
+      } catch (e) {
+        res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+        return res.end(String(e.message || e));
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify(sync.status()));
+    }
     if (url.pathname === '/api/settings') {
       if (req.method === 'POST') {
         let raw = '';
         for await (const chunk of req) raw += chunk;
         const patch = JSON.parse(raw || '{}');
         const next = settings.set(patch);
+        if ('syncAuto' in patch || 'syncLaunchAfter' in patch || 'background' in patch || 'autostart' in patch) sync.push();
+        if (patch.syncAuto) sync.maybeAuto('enable').catch(() => {});
         if (patch.roots) {
           scanner = new Scanner({ roots: next.roots, cacheFile: path.join(dataDir, 'parse-cache.bin') });
           cached = null;

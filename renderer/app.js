@@ -13,6 +13,7 @@ import { ContextView } from './views/context.js';
 import { Tools } from './views/tools.js';
 import { TimeView } from './views/time.js';
 import { SettingsView } from './views/settings.js';
+import { AccountsView } from './views/accounts.js';
 import { Viewer } from './views/transcript.js';
 
 const NAV = [
@@ -23,6 +24,7 @@ const NAV = [
   { key: 'context', label: 'Что в контексте', icon: '◧' },
   { key: 'tools', label: 'Инструменты и модели', icon: '⚒' },
   { key: 'time', label: 'Время и лимиты', icon: '◷' },
+  { key: 'accounts', label: 'Аккаунты Claude', icon: '⇄' },
   { key: 'settings', label: 'Настройки', icon: '⚙' },
 ];
 
@@ -135,6 +137,8 @@ function App() {
       setBusy(false);
       setNow(Date.now());
     });
+    // Трей и уведомления открывают нужный экран.
+    const off3 = window.api.onNav ? window.api.onNav((v) => setRoute({ view: v })) : () => {};
     Promise.all([window.api.getSettings(), window.api.getDataset()])
       .then(([s, d]) => {
         setSettings(s);
@@ -158,6 +162,7 @@ function App() {
     return () => {
       off1();
       off2();
+      off3();
       clearInterval(t);
     };
   }, []);
@@ -231,12 +236,13 @@ function App() {
     case 'tools': view = html`<${Tools} />`; break;
     case 'time': view = html`<${TimeView} />`; break;
     case 'settings': view = html`<${SettingsView} />`; break;
+    case 'accounts': view = html`<${AccountsView} />`; break;
     case 'transcript':
     case 'journal':
     case 'script': view = html`<${Viewer} route=${route} />`; break;
     default: view = html`<${Overview} />`;
   }
-  const showFilters = !['settings', 'session', 'transcript', 'journal', 'script'].includes(route.view);
+  const showFilters = !['settings', 'accounts', 'session', 'transcript', 'journal', 'script'].includes(route.view);
   const scan = ds.meta.scan || {};
 
   return html`<${AppCtx.Provider} value=${ctx}>
